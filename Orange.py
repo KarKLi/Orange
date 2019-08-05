@@ -5,6 +5,7 @@ Orange gives a library that much close to model's structure.
 Orange can construct two types of network. First is linear stacked neural network such as VGGNet, AlexNet, etc.
 Second is non-linear stacked neural network (may have shortcut connection like ResNet or inception-block like GoogleNet).
 Orange is a abstract library based on tensorflow.keras, so it doesn't provide the basic operation of math such as gradient computation, etc.
+Orange doesn't provide the interface of RNN and mbedding layer. If you want to use it in the network built by Orange, use AddLayer interface.
 All the input data should follow the format of  (batch, height, width, channels)
 Followed by MIT license.
 """
@@ -116,7 +117,7 @@ class __Orange(object):
     Adam - A Method for Stochastic Optimization
     http://arxiv.org/abs/1412.6980v8
     """
-        return tf.keras.optimizers.Adam(lr,beta_1,beta_2,epslion,decay.amsgrad)
+        return tf.keras.optimizers.Adam(lr,beta_1,beta_2,epslion,decay,amsgrad)
 
     def __MSE():
         """Mean squared error (MSE) is a loss function used in model complication.
@@ -451,15 +452,173 @@ class __Orange(object):
 
     def __Callback(param=[]):
         """Callback function, a function which used in model execution.
-        The param is a list which can have this values:
+    The param is a list which can have this values:
     @ param:
-    param -- a list contain the callback functions.
+    param -- a list contains the callback functions.
     'NaN', TerminateOnNaN, if the Loss is too big, stop the training process.
-    'SaveCheckpoint', ModelCheckpoint, save the model after a epoch. If you pass the SaveCheckPoint, the next element of the param must be a dict which set 
-    the parameters of ModelCheckpoint.
-    'EarlyStopping', EarlyStopping, stop the training process when the monitored index doesn't increase/decrease.
-    'LearningRateChange', 
+    'SaveCheckpoint', ModelCheckpoint, save the model after a epoch. If you pass the SaveCheckPoint and other callbacks, the next element of the param must be a dict which set 
+    the parameters of ModelCheckpoint or callbacks.
+    'EarlyStopping', EarlyStopping, stops the training process when the monitored index doesn't increase/decrease.
+    'LearningRateChange', LearningRateScheduler, changes the lr by your own regulation (accomplished by customized function).
+    'TensorBoard'. TensorBoard, uses the visualization tools provided by TensorFlow.
+    'CSVLogger', CSVLogger, saves the result to the CSV file.
+    'SaveLoss' saves the loss during the training process.
+    'OwnCallback' use your own callback function, after this string you should pass your own function directly.
     """
+        i=0
+        if len(param) == 0:
+            return param
+        params=[]
+        while i<len(param):
+            if param[i] == 'NaN':
+                params.append(tf.keras.callbacks.TerminateOnNaN())
+                i += 1
+            elif param[i] ==  'SaveCheckpoint':
+                TP=[]
+                if param[i+1].get('filepath') is None:
+                    raise ValueError('You doesn\'t pass the save file path!')
+                else:
+                    TP.append(param[i+1].get('filepath'))
+                if param[i+1].get('monitor') is None:
+                    TP.append('val_loss')
+                else:
+                    TP.append(param[i+1].get('monitor'))
+                if param[i+1].get('verbose') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('verbose'))
+                if param[i+1].get('save_best_only') is None:
+                    TP.append(False)
+                else:
+                    TP.append(param[i+1].get('save_best_only'))
+                if param[i+1].get('save_weights_only') is None:
+                    TP.append(False)
+                else:
+                    TP.append(param[i+1].get('save_weights_only'))
+                if param[i+1].get('mode') is None:
+                    TP.append('auto')
+                else:
+                    TP.append(param[i+1].get('mode'))
+                if param[i+1].get('period') is None:
+                    TP.append(1)
+                else:
+                    TP.append(param[i+1].get('period'))
+                params.append(tf.keras.callbacks.ModelCheckpoint(TP[0],TP[1],TP[2],TP[3],TP[4],TP[5],TP[6],TP[7]))
+                i+=2
+            elif param[i] == 'EarlyStopping':
+                TP=[]
+                if param[i+1].get('monitor') is None:
+                    TP.append('val_loss')
+                else:
+                    TP.append(param[i+1].get('monitor'))
+                if param[i+1].get('min_delta') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('min_delta'))
+                if param[i+1].get('patience') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('patience'))
+                if param[i+1].get('verbose') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('verbose'))
+                if param[i+1].get('mode') is None:
+                    TP.append('auto')
+                else:
+                    TP.append(param[i+1].get('mode'))
+                if param[i+1].get('baseline') is None:
+                    TP.append(None)
+                else:
+                    TP.append(param[i+1].get('baseline'))
+                if param[i+1].get('restored_best_weights') is None:
+                    TP.append(False)
+                else:
+                    TP.append(param[i+1].get('restored_best_weights'))
+                params.append(tf.keras.callbacks.EarlyStopping(TP[1],TP[2],TP[3],TP[4],TP[5],TP[6],TP[7]))
+                i+=2
+            elif param[i] == 'LearningRateChange':
+                TP=[]
+                if param[i+1].get('schedule') is None:
+                    raise ValueError('Please pass a changing function when you call LearningRateChange')
+                else:
+                    TP.append(param[i+1].get('schedule'))
+                if param[i+1].get('verbose') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('verbose'))
+                params.append(tf.keras.callbacks.LearningRateScheduler(TP[0],TP[1]))
+                i+=2
+            elif param[i] == 'TensorBoard':
+                TP=[]
+                if param[i+1].get('log_dir') is None:
+                    TP.append('./logs')
+                else:
+                    TP.append(param[i+1].get('log_dir'))
+                if param[i+1].get('histogram_freq') is None:
+                    TP.append(0)
+                else:
+                    TP.append(param[i+1].get('histogram_freq'))
+                if param[i+1].get('batch_size') is None:
+                    TP.append(32)
+                else:
+                    TP.append(param[i+1].get('batchsize'))
+                if param[i+1].get('write_graph') is None:
+                    TP.append(True)
+                else:
+                    TP.append(param[i+1].get('write_graph'))
+                if param[i+1].get('write_grads') is None:
+                    TP.append(False)
+                else:
+                    TP.append(param[i+1].get('write_grads'))
+                if param[i+1].get('write_images') is None:
+                    TP.append(False)
+                else:
+                    TP.append(param[i+1].get('write_images'))
+                params.append(tf.keras.callbacks.TensorBoard(TP[0],TP[1],TP[2],TP[3],TP[4],TP[5],TP[6]))
+                i+=2
+            elif param[i] == 'CSVLogger':
+                if param[i+1].get('filename') is None:
+                    raise ValueError('Pass the CSV file name when you call CSVLogger!')
+                else:
+                    params.append(tf.keras.callbacks.CSVLogger(param[i+1].get('filename')))
+                i+=2
+            elif param[i] == 'SaveLoss':
+                class LossHistory(keras.callbacks.Callback):
+                    def on_train_begin(self, logs={}):
+                        self.losses = []
+
+                    def on_batch_end(self, batch, logs={}):
+                        self.losses.append(logs.get('loss'))
+
+                params.append(LossHistory())
+                i+=1
+            elif param[i] == 'OwnCallback':
+                params.append(param[i+1])
+        return params
+
+    def ModelCompile(self,optimizer,loss,metrics=None,y_labels=None):
+        """Compile the model with designated optimizer and loss.
+    @ param:
+    optimizer -- There are three options of optimizer, Adam, SGD and RMSProp, call these optimizers followed by the rule below:
+    \t 'Adam,lr,decay' which the lr and decay are truth value.
+    \t 'SGD,lr,momentum,decay' which the lr, momemtum and decay are truth value.
+    \t 'nes-SGD,lr,momentum,decay' if you want to use nesterov momemtum.
+    \t 'RMSProp,lr,decay' which the lr and decay are truth value.
+    loss -- There are six options of optimizer, MAE, MAPE, MSE, Crossentropy, Hinge and logcosh
+    possible value: 'MAE', 'MAPE', 'MSE', 'Sig-CE', 'Sof-CE', 'SP-Sig-CE', 'hinge', 'S-hinge', 'C-hinge', 'logcosh',
+    which is Mean Average Error, Mean Average Percentage Error, Mean Squared Error, Binary Crossentropy, Categorical Crossentropy,
+    Sparse Categorical Crossentropy, Hinge, Squared Hinge, Categorical Hinge, logcosh function.
+    If the loss is 'SP-Sig-CE', you should also pass the y_labels into this function for preprocessing.
+    """
+        opt=None
+        if 'Adam' in optimizer:
+            param=list(optimizer.split(','))
+            opt=self.__Adam(lr=param[1],decay=param[2])
+        elif 'SGD' in optimizer:
+            param=list(optimizer.split(','))
+            opt=self.__SGD(lr=param[1],momentum=param[2],decay=param[3])
+
     
     """
     Fourth part of the Orange library : Visualization, image and video process.
