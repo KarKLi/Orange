@@ -25,7 +25,7 @@ class ExecutionError(BaseException):
 """
     pass
 
-class __Orange(object):
+class OrangeLinear(object):
     def __init__(self,model_name,input_shape):
         """__init__ accept two parameters, model_name and input_shape,
     @ param:
@@ -44,15 +44,25 @@ class __Orange(object):
         self.__shape=input_shape
         self.__model=tf.keras.Sequential()
         print('Orange initialization complete.')
-        # self.__modelhasbuilt=False
-        # Put it in OrangeLinear
-
+        self.__modelhasbuilt=False
 
     def Getmodelname(self):
         """Getmodelname returns the name of model.
     """
         return self.__model_name
 
+    def GetInputShape(self):
+        """Return the self.__shape
+    """
+        return self.__shape
+
+    def Displaymodel(self):
+        """Print the model'summary by using the bulit-in function tf.keras.Sequential.summary()
+    """
+        if self.__modelhasbuilt is True:
+            self.__model.summary()
+        else:
+            raise ExecutionError('Please compile your model first.')
 
     """
     First part of the Orange library : Regularizers, optimizers, loss and noise.
@@ -155,6 +165,10 @@ class __Orange(object):
     @ formula:
     min_{W,b}\sum_{i=1}^N\sum_{j not equal to y_i}max(0,s_j-s_{y_i}+1)+\lambda \sum_k \sum_n W_{k,n}^2
 
+    @ param:
+    squared -- Use squared_hinge loss.
+    categorical -- Use categorical_hinge loss.
+
     Hinge loss always used in SVM task. If you want to use squared hinge loss, set the sqaured parameter as True.
     If you want to use categorical hinge loss, set the categorical parameter as True.
     DON'T set the parameters True at the same time!
@@ -192,14 +206,16 @@ class __Orange(object):
     """
         if Sigmoid is True:
             return tf.keras.losses.binary_crossentropy
-        elif Softmax is True and y_labels is not None:
+        elif Softmax is True and Sparse is not True and y_labels is not None:
             from keras.utils.np_utils import to_categorical
             y_labels=to_categorical(y_labels,num_classes=None)
             return tf.keras.losses.categorical_crossentropy
-        else:
+        elif Softmax is True and Sparse is True and y_labels is not None:
             import numpy as np
             y_labels=np.expand_dims(y_labels,-1)
             return tf.keras.losses.sparse_categorical_crossentropy
+        else:
+            raise ValueError('Pass invalid parameters to __crossentropy!')
 
     def GaussianNoise(self,stddev,input_shape=None):
         """Gaussian Noise layer. Add a noise which its distribution follow the Gaussian distribution.
@@ -251,11 +267,10 @@ class __Orange(object):
     @ param:
     layer : A tf.keras.layers object.
     """
-        if isinstance(layer,tf.keras.layers) is not True:
+        if isinstance(layer,type(tf.keras.layers)) is not True:
             print('The layer passed in is not tf.keras.layers, check your object\'s type.')
         else:
             self.__model.add(layer)
-
 
     def flatten(self,input_shape=None):
         """Flatten accept most 1 parameter, the flatten layer will convert a matrix into a one-dimensional vector.
@@ -266,7 +281,14 @@ class __Orange(object):
             self.__model.add(tf.keras.layers.Flatten(input_shape=input_shape))
             self.__shape=input_shape
         else:
-            self.__model.add(tf.keras.layers.Flatten(input_shape=__shape))
+            self.__model.add(tf.keras.layers.Flatten(input_shape=self.__shape))
+
+    def dropout(self,ratio):
+        """Dropout accept 1 parameter. The function of dropout is kill some neurals randomly to avoid over-fitting.
+    @ param :
+    ratio -- The drop ratio of neural units.
+    """
+        self.__model.add(tf.keras.layers.Dropout(ratio))
     
     def relu(self,neural_numbers):
         """relu accept 1 parameter, the relu layer will activate the neural unit.
@@ -308,7 +330,6 @@ class __Orange(object):
     """
         self.__model.add(tf.keras.layers.Dense(neural_numbers,activation=tf.nn.sigmoid))
 
-
     def softmax(self,neural_numbers):
         """softmax accept 1 parameter, softmax layer is always at the final layer in classfication task 
     to output the possibilities of each classes.
@@ -333,7 +354,7 @@ class __Orange(object):
     """
         self.__model.add(tf.keras.layers.BatchNormalization(axis=axis,momentum=momentum,epslion=epslion))
     
-    def Convolution(self,output_depth,kernel_size,x_stride,y_stride=None,padding='valid'):
+    def Convolution(self,output_depth,kernel_size,x_stride,y_stride=None,activation='relu',padding='valid'):
         """Convolution is one of the most important operations in neural network. After convolutional operation the image can
     get the new matrix set which called 'feature map'.
     @ param :
@@ -342,20 +363,62 @@ class __Orange(object):
     have the same size on x-axis and y-axis, just pass one integer.
     stride : The stride of kernel move. Passing one integer in general. If you want to have different stride on different
     direction, pass a tuple with two integers (x,y).
+    activation : The activation function, default value is 'relu',if you don't want to use activation function, set activation as None manully.
     padding : Padding zero before convolution operation or not. The default value is 'valid', which means not padding zero.
     Pass 'same' if you want to padding zero.
     """
-        if y_stride is not None:
-            self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
-                                           stride= (x_stride,y_stride),
+        firstlayer=False
+        try:
+            self.__model.get_layer()
+        except ValueError:
+            firstlayer=True
+
+        if firstlayer is False:
+            if activation is not None:
+                if y_stride is not None:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides= (x_stride,y_stride),activation='relu',
                                            padding=padding
                                            ))
-        else:
-            self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                else:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides=x_stride,activation='relu',
+                                           padding=padding
+                                           ))
+            else:
+                if y_stride is not None:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides= (x_stride,y_stride),
+                                           padding=padding
+                                           ))
+                else:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
                                            strides=x_stride,
                                            padding=padding
                                            ))
-
+        else:
+            if activation is not None:
+                if y_stride is not None:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides= (x_stride,y_stride),activation='relu',
+                                           padding=padding,input_shape=(self.__shape[0],self.__shape[1],3)
+                                           ))
+                else:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides=x_stride,activation='relu',
+                                           padding=padding,input_shape=(self.__shape[0],self.__shape[1],3)
+                                           ))
+            else:
+                if y_stride is not None:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides= (x_stride,y_stride),
+                                           padding=padding,input_shape=(self.__shape[0],self.__shape[1],3)
+                                           ))
+                else:
+                    self.__model.add(tf.keras.layers.Conv2D(filters=output_depth,kernel_size=kernel_size,
+                                           strides=x_stride,
+                                           padding=padding,input_shape=(self.__shape[0],self.__shape[1],3)
+                                           ))
 
     def pooling(self,pool_size,strides,padding='valid',pool_type='maxpooling'):
         """Pooling layer is a layer to highlight the feature of feature map.
@@ -609,17 +672,81 @@ class __Orange(object):
     possible value: 'MAE', 'MAPE', 'MSE', 'Sig-CE', 'Sof-CE', 'SP-Sig-CE', 'hinge', 'S-hinge', 'C-hinge', 'logcosh',
     which is Mean Average Error, Mean Average Percentage Error, Mean Squared Error, Binary Crossentropy, Categorical Crossentropy,
     Sparse Categorical Crossentropy, Hinge, Squared Hinge, Categorical Hinge, logcosh function.
-    If the loss is 'SP-Sig-CE', you should also pass the y_labels into this function for preprocessing.
+    If the loss is 'SP-Sig-CE', you should also pass the y_labels into this function for label preprocessing.
     """
         opt=None
         if 'Adam' in optimizer:
             param=list(optimizer.split(','))
+            param=[param[0]]+[float(i) for i in param[1:]]
             opt=self.__Adam(lr=param[1],decay=param[2])
-        elif 'SGD' in optimizer:
+        elif 'SGD' in optimizer and 'nes-SGD' not in optimizer:
             param=list(optimizer.split(','))
+            param=[param[0]]+[float(i) for i in list(param[1:])]
             opt=self.__SGD(lr=param[1],momentum=param[2],decay=param[3])
+        elif 'nes-SGD' in optimizer:
+            param=list(optimizer.split(','))
+            param=[param[0]]+[float(i) for i in param[1:]]
+            opt=self.__SGD(param[1],param[2],param[3],True)
+        elif 'RMSProp' in optimizer:
+            param=list(optimizer.split(','))
+            param=[param[0]]+[float(i) for i in param[1:]]
+            opt=self.__RMSProp(lr=param[1],decay=param[2])
 
+        lossfunc=''
+        if loss == 'MAE':
+            lossfunc=self.__MAE()
+        elif loss == 'MAPE':
+            lossfunc=self.__MAPE()
+        elif loss == 'MSE':
+            lossfunc=self.__MSE()
+        elif loss == 'Sig-CE':
+            lossfunc=self.__crossentropy(Sigmoid=True)
+        elif loss == 'Sof-CE':
+            lossfunc=self.__crossentropy(Softmax=True,y_labels=y_labels)
+        elif loss == 'SP-Sig-CE':
+            lossfunc=self.__crossentropy(Sigmoid=True,Sparse=True,y_labels=y_labels)
+        elif loss == 'hinge':
+            lossfunc=self.__hinge()
+        elif loss == 'S-hinge':
+            lossfunc=self.__hinge(squared=True)
+        elif loss == 'C-hinge':
+            lossfunc=self.__hinge(categorical=True)
+        elif loss == 'logcosh':
+            lossfunc=self.__logcosh()
+
+        if metrics is None:
+            self.__model.compile(optimizer=opt,loss=lossfunc,metrics=['accuracy'])
+            self.__modelhasbuilt=True
+        else:
+            self.__model.compile(optimizer=opt,loss=lossfunc,metrics=metrics)
+            self.__modelhasbuilt=True
     
+    def ModelTrain(data,label,batch_size=None,epochs=1,validation_data=None,verbose=1,callbacks=None,**kwargs):
+        """ Train the model with the specify data.
+    @ param :
+    data -- The input data
+    label -- The input data's label.
+    batch_size -- A batch's size.
+    epochs -- The epoch of training process.
+    verbose -- The verbose mode, 0 -- quiet mode, 1 -- progress bar, 2 -- a line per epoch
+    validation_data -- The validation data after a epoch's training.
+    callbacks -- The callback function you want to call.
+    **kwargs -- The function name you want to call and the parameter you want to pass. (For 'OwnCallback', the next parameter is the function directly.)
+
+    'NaN', TerminateOnNaN, if the Loss is too big, stop the training process.
+    'SaveCheckpoint', ModelCheckpoint, save the model after a epoch. If you pass the SaveCheckPoint and other callbacks, the next element of the param must be a dict which set 
+    the parameters of ModelCheckpoint or callbacks.
+    'EarlyStopping', EarlyStopping, stops the training process when the monitored index doesn't increase/decrease.
+    'LearningRateChange', LearningRateScheduler, changes the lr by your own regulation (accomplished by customized function).
+    'TensorBoard'. TensorBoard, uses the visualization tools provided by TensorFlow.
+    'CSVLogger', CSVLogger, saves the result to the CSV file.
+    'SaveLoss' saves the loss during the training process.
+    'OwnCallback' use your own callback function, after this string you should pass your own function directly.
+    """
+        pass
+        
+        
+
     """
     Fourth part of the Orange library : Visualization, image and video process.
     """
@@ -637,10 +764,10 @@ class __Orange(object):
     @ param:
     path -- the path for the CIFAR-10 dataset.
     """
-        from urllib import HTTPError
+        from urllib import error
         try:
             (x_train,y_train),(x_test,y_test)=tf.keras.datasets.cifar10.load_data()
-        except HTTPError:
+        except error.HTTPError:
             # Copy by the keras source code.
             cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
             datadir_base = os.path.expanduser(cache_dir)
@@ -668,10 +795,10 @@ class __Orange(object):
     path -- the path for the CIFAR-10 dataset.
     label_model -- 'fine' or 'coarse', means the label's accuracy (maybe?)
     """
-        from urllib import HTTPError
+        from urllib import error
         try:
             (x_train,y_train),(x_test,y_test)=tf.keras.datasets.cifar100.load_data(label_mode=label_mode)
-        except HTTPError:
+        except error.HTTPError:
             # Copy by the keras source code.
             cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
             datadir_base = os.path.expanduser(cache_dir)
@@ -702,17 +829,10 @@ class __Orange(object):
             (x_train,y_train),(x_test,y_test)=tf.keras.datasets.imdb.load_data()
         except HTTPError:
             pass
-    #def Displaymodel(self):
-    #    if self.__modelhasbuilt is True:
-    #        self.__model.summary()
-    #    else:
-    #        print('Please compile your model first.')
-    #"""
-    #Print the model'summary by using the bulit-in function tf.keras.Sequential.summary()
-    #"""
+
     # Put in OrangeLinear
+
+
 
 if __name__ == '__main__':
     print('Usage : import Orange')
-    print('Or from Orange import OrangeLinear')
-    print('Or from Orange import OrangeNonLinear')
