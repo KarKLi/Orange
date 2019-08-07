@@ -1,5 +1,5 @@
 # Orange
-A computer vision simplified deep learning framework based on keras.
+A simplified computer vision deep learning framework based on keras.
 
 This library is still completing.
 
