@@ -10,23 +10,25 @@ All the input data should follow the format of  (batch, height, width, channels)
 Followed by MIT license.
 """
 import os,sys
+import numpy as np
 # import TensorFlow
 try:
     import tensorflow as tf
 except ImportError:
     raise ImportError('Please install TensorFlow first.')
 
+__version__='1.0.0'
 class VersionError(BaseException):
     """Just an error, never mind.
 """
     pass
+
 class ExecutionError(BaseException):
     """Just an error, never mind.
 """
     pass
 
 class OrangeLinear(object):
-    __version__='1.0.0'
 
     def __init__(self,model_name,input_shape):
         """__init__ accept two parameters, model_name and input_shape,
@@ -848,6 +850,46 @@ class OrangeLinear(object):
         plt.legend(('Validate loss','Validate accuracy'))
         plt.show()
 
+    def ImageDisplay(filepath,Matrix=None,grayscale=False,WindowName=None):
+        """ImageDisplay, a function for image display.
+    @ param:
+    filepath -- A string if you want to load image from file. If you want to show the matrix directly, set the filepath as None.
+    Matrix -- A numpy array of image. If you want to load image from file, keep the default value.
+    grayscale -- Drop out the color channel of the image or not. The default value is not (False).
+    """
+        try:
+            import cv2 as cv
+        except ImportError:
+            raise ImportError('Please install OpenCV for image display!')
+        if filepath is None and Matrix is None:
+            raise ValueError('You pass the invalid parameter when calling ImageDisplay!')
+        elif filepath is None:
+            if Matrix.max() > 255 or Matrix.min() < 0: # means that it's not a standard image.
+                Matrix=(Matrix-Matrix.min())/(Matrix.max()-Matrix.min())*255
+                Matrix=Matrix.astype(np.uint8)
+        elif filepath is not None and Matrix is None and grayscale is False:
+            Matrix=cv.imread(filepath)
+        else:
+            Matrix=cv.imread(filepath,flags=cv.IMREAD_GRAYSCALE)
+        if WindowName is None:
+            print('Press q to exit.')
+            cv.imshow('image',Matrix)
+            while True:
+                if cv.waitKey(0) & 0xff == ord("q"):
+                    cv.destroyWindow('image')
+                    break
+                else:
+                    continue
+        else:
+            print('Press q to exit.')
+            cv.imshow(WindowName,Matrix)
+            while True:
+                if cv.waitKey(0) & 0xff ==ord('q'):
+                    cv.destroyWindow(WindowName)
+                else:
+                    continue
+
+
     """
     Fifth part of the Orange library : Common datasets.
     """
@@ -921,10 +963,10 @@ class OrangeLinear(object):
         @ param:
         path -- the path for the IMDB dataset.
     """
-        from urllib import HTTPError
+        from urllib import error
         try:
             (x_train,y_train),(x_test,y_test)=tf.keras.datasets.imdb.load_data()
-        except HTTPError:
+        except error.HTTPError:
             pass
 
     # Put in OrangeLinear
