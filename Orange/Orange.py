@@ -820,6 +820,16 @@ class OrangeLinear(object):
     """
         return self.__model.evaluate(data,label,batch_size,verbose,None,steps)
 
+    def ModelPredict(self,data,batch_size=None,verbose=0,steps=None):
+        """ModelPredict is a function for unknown data's label prediction. Returns the prediction Numpy array.
+    @ param :
+    data -- The input data.
+    batch_size -- The batch size which the default value is 32.
+    verbose -- 0, quiet mode. 1, display mode.
+    steps -- An integer if you want to declare the total steps before the evaluation stops. None for default.
+    """
+        return self.__model.predict(data,batch_size,verbose,steps)
+
     """
     Fourth part of the Orange library : Visualization, image and video process.
     """
@@ -967,7 +977,21 @@ class OrangeLinear(object):
         try:
             (x_train,y_train),(x_test,y_test)=tf.keras.datasets.imdb.load_data()
         except error.HTTPError:
-            pass
+            # Copy by the keras source code.
+            cache_dir = os.path.join(os.path.expanduser('~'), '.keras')
+            datadir_base = os.path.expanduser(cache_dir)
+            if not os.access(datadir_base, os.W_OK):
+                datadir_base = os.path.join('/tmp', '.keras')
+                cache_subdir='datasets'
+                datadir = os.path.join(datadir_base, cache_subdir)
+            if not os.path.exists(datadir):
+                os.makedirs(datadir)
+            fname='cifar-10-batches-py.tar.gz'
+            fpath = os.path.join(datadir, fname)
+            from shutil import copyfile
+            copyfile(path,datadir)
+            (x_train,y_train),(x_test,y_test)=tf.keras.datasets.imdb.load_data(label_mode=label_mode)
+            return (x_train,y_train),(x_test,y_test)
 
     # Put in OrangeLinear
 
